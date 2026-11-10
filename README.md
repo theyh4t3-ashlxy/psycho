@@ -6,31 +6,39 @@
 
 ### the $1,300 titanium brick
 
-you buy a samsung galaxy s24 ultra. titanium chassis, snapdragon 8 gen 3, 2,600-nit panel, and qualcomm's "groundbreaking" 3d sonic gen 2 ultrasonic acoustic sensor. 
+you buy a samsung galaxy s24 ultra. titanium chassis, snapdragon 8 gen 3, 2,600-nit amoled panel, and qualcomm's "groundbreaking" 3d sonic gen 2 (`QBT4000`) ultrasonic sensor. 
 
-you wipe the phone, or you peel off a screen protector, or you just delete your fingerprints to re-enroll your thumbs.
+you wipe the phone, or you peel off a screen protector, or you just delete your fingerprints to re-enroll them cleanly.
 
-you tap **register**.
-
-the screen sits on **"getting ready..."** for a fraction of a second. you dare to bring your finger within three inches of the display, and the phone immediately shrieks:
+in the setup wizard, it greets you with:
 
 ```text
-"make sure the fingerprint sensor is clean and dry"
+"when you finish up setting your phone, you can try again in settings. make sure the fingerprint sensor is clean and dry."
 ```
 
-or if you press it, it instantly self-destructs in 39 milliseconds with:
+so you finish setup, go into settings, and try to register a thumb. depending on how you hold your finger, the hal gives you two distinct flavors of software lobotomy:
 
-```text
-"an error occurred with the fingerprint sensor. if this keeps happening, restart your phone."
-(vendor error 1001)
-```
+1. **if you don't press firmly:**  
+   the second you tap register, before your skin even touches the glass, it flashes:
+   ```text
+   "make sure the fingerprint sensor is clean and dry"
+   ```
+2. **if you press your thumb firmly before tapping register:**  
+   it flashes:
+   ```text
+   "getting fingerprint scanner ready..."
+   ```
+   and then crashes and kicks you straight back to the biometrics menu in **36 milliseconds**.
+
+it closes so aggressively fast that you literally have to take a screen recording video and scrub through the video player frame-by-frame just to screenshot the error dialogue before the activity destroys itself.
 
 you restart the phone. clean and dry.  
 you wipe the cache partition. clean and dry.  
 you wipe the glass with a microfiber cloth until you can see your ancestors in the reflection. clean and dry.  
 you factory reset your phone. clean and dry.  
+you contemplate putting the phone in a clothes dryer. clean and dry.
 
-congratulations. your sensor isn't dirty. your sensor isn't wet. your phone has just been lobotomized by its own firmware.
+congratulations: your sensor isn't dirty. your sensor isn't wet. your phone has just been trapped in an unrecoverable firmware livelock.
 
 ---
 
@@ -84,7 +92,7 @@ the root cause is a catastrophic architectural circle-jerk between samsung's bat
 |  thermal expansion shifts acoustic velocity through glass.  |
 |  qfp_contamination_detection_check sees phase delay and     |
 |  assumes the screen is caked in grease or acoustic spoof.   |
-|  ABORTS IN 39MS: "MAKE SURE SENSOR IS CLEAN AND DRY" (1001) |
+|  ABORTS IN 36MS: "MAKE SURE SENSOR IS CLEAN AND DRY" (1001) |
 +-------------------------------------------------------------+
                               |
                               v
@@ -117,7 +125,7 @@ it shoots an ultrasonic acoustic ping through the amoled glass and measures the 
 the speed of sound through amoled glass changes with temperature ($c \propto \sqrt{T}$, roughly $1.5\,\text{m/s}$ per degree celsius):
 - if your phone is sitting in your bedroom at **25.5°c**, the delta is $+1.53^\circ\text{c}$.
 - qualcomm's trustlet sees the echo delay, assumes someone slapped a layer of gelatin or silicone over the glass to spoof your identity, and aborts with error 48 (`0x30` -> vendor 1001).
-- the samsung ui displays: *"make sure the fingerprint sensor is clean and dry"* or gets stuck on *"getting ready..."* before crashing.
+- the samsung ui displays: *"make sure the fingerprint sensor is clean and dry"* or gets stuck on *"getting fingerprint scanner ready..."* before crashing.
 
 you can't enroll without background calibration. you can't get background calibration without enrolling. an absolute masterclass in software engineering.
 
