@@ -50,8 +50,8 @@ def get_battery_temp():
 
 def trigger_enrollment():
     print("\n" + "="*60)
-    print(">>> STRIKE WINDOW REACHED <<<")
-    print(f">>> LAUNCHING ENROLLMENT INTENT NOW <<<")
+    print(">>> strike window reached <<<")
+    print(f">>> launching enrollment intent now <<<")
     print("="*60 + "\n")
     # ring terminal bell
     sys.stdout.write("\a\a\a")
@@ -74,7 +74,7 @@ def main():
     current_prints = run_adb(["shell", "dumpsys fingerprint | grep -o '\"count\":[0-9]*' | head -n 1"])
     print(f"[*] current registered templates: {current_prints or 'unknown'}")
 
-    print("\n--- INSTRUCTIONS ---")
+    print("\n--- instructions ---")
     print("1. your sensor is trapped in a trustzone livelock because template count == 0")
     print("   purged continuous background acoustic estimation (cbgePreForceStop in libsfp_sensor.so).")
     print(f"2. qualcomm's securefp.elf baseline is locked to factory bin 0 ({FACTORY_BASELINE}°c).")
@@ -84,7 +84,7 @@ def main():
     print("   (dew-point condensation will scatter ultrasonic pulses and trigger error 48).")
     print("6. let the phone rest at room temp. this script will alert you the second it hits the window.\n")
 
-    input("press [ENTER] once you have cooled the device and are ready to monitor... ")
+    input("press [enter] once you have cooled the device and are ready to monitor... ")
 
     print("\n[*] polling thermal sensors...")
     strike_fired = False
@@ -97,7 +97,7 @@ def main():
             continue
 
         delta = temp - FACTORY_BASELINE
-        status = "HOLD (too cold)" if temp < TARGET_TEMP_MIN else ("HOLD (too warm)" if temp > TARGET_TEMP_MAX else "GOLDILOCKS WINDOW")
+        status = "hold (too cold)" if temp < TARGET_TEMP_MIN else ("hold (too warm)" if temp > TARGET_TEMP_MAX else "goldilocks window")
 
         bar_len = 20
         # scale from 15C to 35C
