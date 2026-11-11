@@ -1,14 +1,8 @@
-# psycho
+oh, boy.. you buy a samsung galaxy s24 ultra. "it's a cool phone", you say. you even glaze the fingerprint sensor (which you repeat the echo chamber's specs. it's a "qualcomm 3d sonic" sensor. who cares?) 
 
-> how samsung's bsp team in suwon and qualcomm's trustzone architects in san diego created a literal psychological warfare simulator on a $1,300 phone, and how a 16-year-old developer beat it with an air conditioner and 20 lines of python.
+so:
 
----
-
-### the $1,300 titanium brick
-
-you buy a samsung galaxy s24 ultra. titanium chassis, snapdragon 8 gen 3, 2,600-nit amoled panel, and qualcomm's "groundbreaking" 3d sonic gen 2 (`QBT4000`) ultrasonic sensor. 
-
-you wipe the phone, or you peel off a screen protector, or you just delete your fingerprints to re-enroll them cleanly.
+you get the phone out. you get to the fingerprint screen. you think it's going to be easy.
 
 in the setup wizard, it greets you with:
 
@@ -16,33 +10,37 @@ in the setup wizard, it greets you with:
 "when you finish up setting your phone, you can try again in settings. make sure the fingerprint sensor is clean and dry."
 ```
 
-so you finish setup, go into settings, and try to register a thumb. depending on how you hold your finger, the hal gives you two distinct flavors of software lobotomy:
+you just shrug it because it's just a software bug, or you wipe the phone, like a human being. or you peel off a screen protector, if the previous owner had one, or you just delete your fingerprints to re-enroll them cleanly. whatever.
+
+so you finish setup, go into settings, and try to register a thumb. depending on how you hold your finger, the hardware abstraction layer gives you two distinct flavors of software lobotomy:
 
 1. **if you don't press firmly:**  
-   the second you tap register, before your skin even touches the glass, it flashes:
+   the second you tap register, before your skin even touches the glass, it says:
    ```text
-   "make sure the fingerprint sensor is clean and dry"
+   "make sure the fingerprint sensor is clean and dry, then try again."
    ```
 2. **if you press your thumb firmly before tapping register:**  
-   it flashes:
+   it says:
    ```text
-   "getting fingerprint scanner ready..."
+   "getting fingerprint scanner ready. start registering your fingerprint when you see the icon."
    ```
    and then crashes and kicks you straight back to the biometrics menu in **36 milliseconds**.
 
-it closes so aggressively fast that you literally have to take a screen recording video and scrub through the video player frame-by-frame just to screenshot the error dialogue before the activity destroys itself.
+regardless of which poison, it closes so aggressively fast that you literally have to take a screen recording video and scrub through the video player frame-by-frame just to screenshot the error dialogue before the activity destroys itself. how ironic.
 
 you restart the phone. clean and dry.  
 you wipe the cache partition. clean and dry.  
 you wipe the glass with a microfiber cloth until you can see your ancestors in the reflection. clean and dry.  
 you factory reset your phone. clean and dry.  
+you flash the firmware to `xaa` because you thought it was going to wipe the fingerprint data. (big mistake.)  
 you contemplate putting the phone in a clothes dryer. clean and dry.
 
-congratulations: your sensor isn't dirty. your sensor isn't wet. your phone has just been trapped in an unrecoverable firmware livelock.
+congratulations: your sensor isn't dirty. your sensor isn't wet. your phone has just been trapped in an unrecoverable firmware livelock.  
+you just joined the club where i'm alone and you just got in it. hi viewer!
 
 ---
 
-### corporate brainrot vs reddit medieval voodoo
+### delusions
 
 if you contact samsung support, their galaxy-brain engineers recommend their signature corporate lobotomy:
 
@@ -103,23 +101,29 @@ the root cause is a catastrophic architectural circle-jerk between samsung's bat
 +-------------------------------------------------------------+
 ```
 
-#### 1. samsung's microamp lobotomy: `cbgePreForceStop`
-inside samsung's proprietary biometric hal (`/vendor/lib64/libsfp_sensor.so`), when `m_enroll_template_count == 0`, suwon's code calls:
+#### 1. samsung's stupid code: `cbgePreForceStop`
+inside samsung's super secure proprietary code and hardware layer ("hal") (aka the `/vendor/lib64/libsfp_sensor.so`), when `m_enroll_template_count == 0`, suwon's code calls:
 ```c
-// libsfp_sensor.so @ offset 0x784a0
 void cbgePreForceStop() {
-    m_bge_mode = 0; // stop continuous background calibration
+    m_bge_mode = 0; 
+    // stop continuous background calibration
     // purge runtime acoustic impedance adaptation bins 1-7
+    // this is in 0x784a0 (offset)
 }
 ```
-the nanosecond your enrolled print count hits zero, samsung kills continuous background estimation. all dynamic acoustic adaptation tables that compensate for room temperature are flushed down the toilet.
+the _VERY_ nanosecond your enrolled print count hits zero, samsung kills continuous background estimation. all dynamic acoustic adaptation tables that compensate for room temperature are flushed down the toilet.
 
 #### 2. qualcomm's trustzone paranoia: `CHECK_CD_BEFORE_ENROLL`
-qualcomm's snapdragon 8 gen 3 trustlet (`securefp.elf`) is certified to the teeth. when enrollment stage 1 starts, it doesn't trust runtime data. it executes:
+the trustlet is certified to the teeth. when enrollment stage 1 starts, it doesn't trust runtime data. it executes:
+
 ```c
 // securefp.elf @ offset 0x4c8eee
 qfp_contamination_detection_check()
 ```
+
+(it's so secure, qualcomm.. so secure that we decompiled it. please don't sue me and google.)  
+(aka `securefp.elf`)
+
 it shoots an ultrasonic acoustic ping through the amoled glass and measures the return echo against factory baseline `bin 0`, which was calibrated in a sterile cleanroom in gumi at exactly **23.97°c**.
 
 the speed of sound through amoled glass changes with temperature ($c \propto \sqrt{T}$, roughly $1.5\,\text{m/s}$ per degree celsius):
@@ -148,12 +152,11 @@ the nanosecond finger 1 hits 100%, `m_enroll_template_count` becomes 1. `cbgePre
 
 ---
 
-### how to run psycho
+### how do i run this
 
-zero root. zero knox trips. stock firmware.
+surprisingly, you don't even need root for this. thank god. you just need to do this:
 
 ```bash
-# 1. clone the repo
 git clone https://github.com/theyh4t3-ashlxy/psycho.git
 cd psycho
 
@@ -165,8 +168,8 @@ python3 recover.py
 ```
 
 follow the terminal:
-1. cool your phone down (ac vent or ice pack wrapped in a cloth) until battery is under 22°c.
-2. wipe the screen bone-dry with a microfiber shirt or cloth. no moisture.
+1. cool your phone down (ac vent or ice pack wrapped in a cloth. pick your poision) until the battery is under 22°c. no more, no less.
+2. wipe the screen with a microfiber shirt or cloth. no moisture. (until you break your screen or scratch it with deeper grooves at a level 7. real ones know)
 3. put the phone down at room temp.
 4. `recover.py` polls `/sys/class/thermal/thermal_zone56/temp` in real time. the second the chassis warms into the `23.40°c`–`24.30°c` goldilocks band, it rings the terminal bell and fires the enrollment intent.
 5. slam your thumb onto the scanner and complete registration to 100%. the livelock is permanently dead.
@@ -174,8 +177,4 @@ follow the terminal:
 ---
 
 ### credits
-
-discovered, decompiled, and documented by **ashley** (16) & **antigravity**.  
-built out of pure unapologetic spite for samsung mobile's bsp department in suwon and qualcomm's trustzone team in san diego.
-
-license: mit / spite-ware. do whatever you want with it, just don't pay samsung $250 for a screen swap.
+samsung's engineers in south korea. also thanks antigravity for reverse engineering it.
