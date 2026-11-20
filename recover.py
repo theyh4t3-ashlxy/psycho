@@ -1,126 +1,160 @@
 #!/usr/bin/env python3
-"""
-psycho - samsung galaxy s24 ultra ultrasonic fingerprint livelock recovery tool
-reverse-engineered by ashley & antigravity
+"""Monitors battery temp via ADB and opens fingerprint enrollment in the target window."""
 
-recovers qualcomm qbt4000 3d sonic gen 2 from the 0-template error 1001 acoustic livelock.
-requires: adb, python 3.8+
-zero root required. knox 0x0 intact.
-"""
-
+import os
+import re
+import shutil
 import subprocess
 import sys
 import time
-import os
 
 TARGET_DEVICE = os.environ.get("ANDROID_SERIAL", "")
 TARGET_TEMP_MIN = 23.40
 TARGET_TEMP_MAX = 24.30
-FACTORY_BASELINE = 23.97
+COOL_THRESHOLD = 22.00
+BASELINE_TEMP = 23.97
 
-def run_adb(args):
+
+def run_adb(args, timeout=5):
     cmd = ["adb"]
     if TARGET_DEVICE:
         cmd.extend(["-s", TARGET_DEVICE])
     cmd.extend(args)
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    return res.stdout.strip()
+    try:
+        res = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+        )
+        return res.returncode, res.stdout.strip(), res.stderr.strip()
+    except subprocess.TimeoutExpired:
+        return -1, "", "adb command timed out"
+
 
 def check_connection():
-    out = run_adb(["get-state"])
-    if "device" not in out:
-        print("[!] no adb device detected. connect via usb or wireless adb and ensure debugging is enabled.")
+    if not shutil.which("adb"):
+        print("[!] adb not found in PATH. install Android Platform-Tools first.")
         sys.exit(1)
-    model = run_adb(["shell", "getprop", "ro.product.model"])
-    chip = run_adb(["shell", "getprop", "ro.board.platform"])
-    print(f"[*] target detected: {model} (platform: {chip})")
+
+    code, out, err = run_adb(["get-state"])
+    if code != 0 or out != "device":
+        if "unauthorized" in err or "unauthorized" in out:
+            print("[!] device is unauthorized. tap 'Allow' on the USB debugging prompt on your phone.")
+        elif "more than one" in err:
+            print("[!] multiple ADB devices detected. set ANDROID_SERIAL to pick one.")
+        else:
+            print("[!] no ADB device detected. plug in via USB (or wireless ADB) with USB debugging enabled.")
+        sys.exit(1)
+
+    _, model, _ = run_adb(["shell", "getprop", "ro.product.model"])
+    _, chip, _ = run_adb(["shell", "getprop", "ro.board.platform"])
+    print(f"[*] connected: {model or 'unknown'} ({chip or 'unknown'})")
+
+
+def get_template_count():
+    code, out, _ = run_adb(["shell", "dumpsys", "fingerprint"])
+    if code != 0:
+        return None
+    match = re.search(r'"count"\s*:\s*(\d+)', out)
+    return int(match.group(1)) if match else None
+
 
 def get_battery_temp():
-    # thermal_zone56 is the battery zone on snapdragon 8 gen 3 (e3quew / SM-S928)
-    val = run_adb(["shell", "cat /sys/class/thermal/thermal_zone56/temp 2>/dev/null"])
-    try:
-        return float(val) / 1000.0
-    except (ValueError, TypeError):
-        # fallback: dumpsys battery
-        b_val = run_adb(["shell", "dumpsys battery | grep temperature"])
+    # High-res thermal zone first (millidegrees C)
+    code, val, _ = run_adb(["shell", "cat", "/sys/class/thermal/thermal_zone56/temp"])
+    if code == 0 and val:
         try:
-            return float(b_val.split(":")[1].strip()) / 10.0
-        except Exception:
-            return None
+            temp = float(val) / 1000.0
+            if 0.0 < temp < 80.0:
+                return temp
+        except ValueError:
+            pass
 
-def trigger_enrollment():
-    print("\n" + "="*60)
-    print(">>> strike window reached <<<")
-    print(f">>> launching enrollment intent now <<<")
-    print("="*60 + "\n")
-    # ring terminal bell
-    sys.stdout.write("\a\a\a")
+    # Fallback: dumpsys battery (tenths of a degree C)
+    code, out, _ = run_adb(["shell", "dumpsys", "battery"])
+    if code == 0:
+        match = re.search(r"temperature:\s*(\d+)", out)
+        if match:
+            temp = int(match.group(1)) / 10.0
+            if 0.0 < temp < 80.0:
+                return temp
+
+    return None
+
+
+def launch_enrollment():
+    print("\n\n[*] target temp reached — opening fingerprint enrollment...")
+    sys.stdout.write("\a")
     sys.stdout.flush()
-    run_adb(["shell", "am", "start", "-a", "android.settings.FINGERPRINT_ENROLL"])
+    code, _, err = run_adb(["shell", "am", "start", "-a", "android.settings.FINGERPRINT_ENROLL"])
+    if code != 0:
+        print(f"[!] couldn't open enrollment automatically ({err or 'unknown error'}).")
+        print("    open Settings -> Security and privacy -> Biometrics -> Fingerprints manually.")
+        return False
+    return True
+
+
+def render_bar(temp):
+    bar_len = 20
+    ratio = max(0.0, min(1.0, (temp - 15.0) / 20.0))
+    filled = int(ratio * bar_len)
+    return "#" * filled + "-" * (bar_len - filled)
+
 
 def main():
-    print(r"""
-  ____  ______   ______ _   _  ____  
- |  _ \/ ___\ \ / / ___| | | |/ __ \ 
- | |_) \___ \\ V / |   | |_| | |  | |
- |  __/ ___) || || |___|  _  | |  | |
- |_|   |____/ |_| \____|_| |_|\____/ 
- 
- samsung s24 ultra fingerprint livelock recovery
- breaking cbgePreForceStop & trustzone error 1001
-""")
     check_connection()
 
-    current_prints = run_adb(["shell", "dumpsys fingerprint | grep -o '\"count\":[0-9]*' | head -n 1"])
-    print(f"[*] current registered templates: {current_prints or 'unknown'}")
+    count = get_template_count()
+    print(f"[*] registered fingerprints: {count if count is not None else 'unknown'}")
+    print(f"[*] target window: {TARGET_TEMP_MIN:.2f}°C - {TARGET_TEMP_MAX:.2f}°C (cool under {COOL_THRESHOLD:.0f}°C first)")
+    print("[*] see INSTRUCTIONS.md for full steps. press Ctrl+C to quit.\n")
 
-    print("\n--- instructions ---")
-    print("1. your sensor is trapped in a trustzone livelock because template count == 0")
-    print("   purged continuous background acoustic estimation (cbgePreForceStop in libsfp_sensor.so).")
-    print(f"2. qualcomm's securefp.elf baseline is locked to factory bin 0 ({FACTORY_BASELINE}°c).")
-    print(f"3. we need the battery sensor to cross into the goldilocks window ({TARGET_TEMP_MIN}°c to {TARGET_TEMP_MAX}°c).")
-    print("4. cool your phone down (place it in front of an ac vent or on a cool pack) until temp is < 22.0°c.")
-    print("5. once cooled, wipe the glass completely bone-dry with a microfiber cloth.")
-    print("   (dew-point condensation will scatter ultrasonic pulses and trigger error 48).")
-    print("6. let the phone rest at room temp. this script will alert you the second it hits the window.\n")
+    armed = False
+    first_read = True
 
-    input("press [enter] once you have cooled the device and are ready to monitor... ")
+    try:
+        while True:
+            temp = get_battery_temp()
+            if temp is None:
+                print("\n[!] couldn't read battery temp, retrying...")
+                time.sleep(1)
+                continue
 
-    print("\n[*] polling thermal sensors...")
-    strike_fired = False
+            # If you already cooled the phone before starting the script, arm right away.
+            # Otherwise wait until it cools below 22°C so it doesn't fire on the way down.
+            if first_read and temp < TARGET_TEMP_MIN:
+                armed = True
+            elif temp <= COOL_THRESHOLD:
+                armed = True
+            first_read = False
 
-    while True:
-        temp = get_battery_temp()
-        if temp is None:
-            print("[!] failed to read thermal sensor. retrying...")
-            time.sleep(1)
-            continue
+            delta = temp - BASELINE_TEMP
+            bar = render_bar(temp)
 
-        delta = temp - FACTORY_BASELINE
-        status = "hold (too cold)" if temp < TARGET_TEMP_MIN else ("hold (too warm)" if temp > TARGET_TEMP_MAX else "goldilocks window")
+            if not armed:
+                status = f"cool below {COOL_THRESHOLD:.0f}°C first"
+            elif temp < TARGET_TEMP_MIN:
+                status = "warming up (wait)"
+            elif temp > TARGET_TEMP_MAX:
+                status = "too warm (cool again)"
+            else:
+                status = "in target window"
 
-        bar_len = 20
-        # scale from 15C to 35C
-        ratio = max(0.0, min(1.0, (temp - 15.0) / 20.0))
-        filled = int(ratio * bar_len)
-        bar = "#" * filled + "-" * (bar_len - filled)
+            sys.stdout.write(f"\r[{bar}] {temp:5.2f}°C ({delta:+5.2f}°C) | {status:<24}")
+            sys.stdout.flush()
 
-        sys.stdout.write(f"\r[{bar}] temp: {temp:5.2f}°c (Δ {delta:+5.2f}°c) | status: {status:18s}")
-        sys.stdout.flush()
-
-        if TARGET_TEMP_MIN <= temp <= TARGET_TEMP_MAX:
-            if not strike_fired:
-                trigger_enrollment()
-                strike_fired = True
-                print("[*] complete enrollment on phone now. do not stop until it hits 100%.")
-                print("[*] once finger 1 is registered, the livelock is permanently broken.")
+            if armed and TARGET_TEMP_MIN <= temp <= TARGET_TEMP_MAX:
+                launch_enrollment()
+                print("[*] finish registering your first fingerprint all the way to 100%.")
+                print("[*] once it saves, reboot your phone and test unlocking.")
                 break
-        elif temp > TARGET_TEMP_MAX and strike_fired:
-            break
 
-        time.sleep(0.5)
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        print("\n[*] stopped.")
 
-    print("\n[*] finished. reboot phone and verify lockscreen unlock.")
 
 if __name__ == "__main__":
     main()
