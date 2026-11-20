@@ -16,11 +16,13 @@ so you finish setup, go into settings, and try to register a thumb. depending on
 
 1. **if you don't press firmly:**
    the second you tap register, before your skin even touches the glass, it says:
+
    ```text
    "make sure the fingerprint sensor is clean and dry, then try again."
    ```
 2. **if you press your thumb firmly before tapping register:**
    it says:
+
    ```text
    "getting fingerprint scanner ready. start registering your fingerprint when you see the icon."
    ```
@@ -103,6 +105,7 @@ the root cause is a catastrophic architectural circle-jerk between samsung's bat
 
 #### 1. samsung's stupid code: `cbgePreForceStop`
 inside samsung's super secure proprietary code and hardware layer ("hal") (aka the `/vendor/lib64/libsfp_sensor.so`), when `m_enroll_template_count == 0`, suwon's code calls:
+
 ```c
 void cbgePreForceStop() {
     m_bge_mode = 0;
@@ -169,7 +172,7 @@ python3 recover.py
 
 follow the terminal:
 1. cool your phone down until the battery is under 22°c. no more, no less. (you can do an ac vent, or an ice pack wrapped in a cloth. pick your poision)
-2. wipe the screen with a microfiber shirt or cloth. no moisture. (until you break your screen or scratch it with deeper grooves at a level 7. real ones know)
+2. wipe the screen with a microfiber shirt or cloth. no moisture. (until you scratch it with deeper grooves at a level 7. real ones know)
 3. put the phone down at room temp.
 4. `recover.py` polls `/sys/class/thermal/thermal_zone56/temp` in real time. the second the chassis warms into the `23.40°c`–`24.30°c` goldilocks band, it rings the terminal bell and fires the enrollment intent.
 5. slam your thumb onto the scanner and complete registration to 100%. the livelock is permanently dead.
